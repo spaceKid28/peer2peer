@@ -125,6 +125,8 @@ class sol:
         """
         # We are going to measure latency as the average of the squared ratios. This significantly punishes high values
         # ie files with lots of demand but very few seeders. 
+
+        # we could use product, linear, anything else. 
         rms_latency = np.sqrt(np.mean([r**2 for r in ratio_per_file]))
         return rms_latency
     
@@ -164,6 +166,7 @@ class sol:
         for li in self.seeders:
             for i in li:
                 if type(i) != int:
+                    print('error')
                     print(i)
                 seeders_per_file[i] += 1
 

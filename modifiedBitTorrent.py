@@ -12,6 +12,10 @@ def main():
   # readjust based on new share ratio criteria
   new_ratio = solution.recalculate(ratio)
   new_latency = solution.calculate_latency(new_ratio)
+
+
+
+  
   print(f"""This is the NEW measure of latency: {new_latency}. 
         \n 
         This is a list of the current file ratios: {new_ratio[:10]}""")
