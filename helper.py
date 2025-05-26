@@ -261,32 +261,7 @@ class simulation:
             plt.savefig(f'graphs/parameter_exploration/num_files_{self.number_of_files_each_user_leeches_seeds}_pct_updating_{self.percentage_users_to_update}_iter_{self.iterations_to_converge}.png', dpi=300)
             plt.close()
         
-        return latency, adjusted_latency
-
-    def build_graph2(self):
-        original_latencies = []
-        new_latencies = []
-        for i in range(self.iterations):
-            random_latency, adjusted_latency = self.build_graph(generate_image = False)
-            original_latencies.append(random_latency)
-            new_latencies.append(adjusted_latency)
-        
-        # We assume latency more or less converges after 1000 runs. We run the simulation
-        # an additional 1000 times (100,000 total cycles)
-
-        # We take a look at each reduction in latency, and see what the distribution looks
-        # like
-        reductions = original_latencies - new_latencies
-
-        # Assume reductions is your list of 1000 latency reduction values
-        plt.figure(figsize=(8, 6))
-        sns.boxplot(y=reductions, color='skyblue')
-        sns.stripplot(y=reductions, color='black', alpha=0.2, jitter=True)
-        plt.ylabel('Latency Reduction')
-        plt.title('Distribution of Latency Reduction Over 1000 Simulations')
-        plt.tight_layout()
-        plt.show()
-        return
+        return latency, new_latency[-1]
 
 
 
