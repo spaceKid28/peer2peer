@@ -1,22 +1,31 @@
 import random
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class sol:
     def __init__(
             self,
             number_of_users: int = 1000, 
             number_of_total_files : int = 1000, 
-            size_of_user_file_library: int = 50
+            size_of_user_file_library: int = 50,
+            percentage_users_to_update: int = .25,
+            number_of_files_each_user_leeches: int = 10,
+            number_of_files_each_user_seeds: int = 10
                  ):
         """
         Args:
             number_of_users (int): Total number of users in the system.
             number_of_total_files (int): Total number of files in the system.
             size_of_user_file_libray (int):  Number of files each user is willing to seed.
+            percentage_users_to_update (int): At each time step, this is the percentage of users who will
+                alter the file they are sharing. We don't want to update every one at the same time
+
         """
         self.number_of_users = number_of_users
         self.number_of_total_files = number_of_total_files
         self.size_of_user_file_library = size_of_user_file_library
+        self.percentage_users_to_update = percentage_users_to_update
 
         # We will say each user has 50 files that they can share if they want to.
         # this will stay constant throughout our experiment
@@ -28,7 +37,7 @@ class sol:
         # represents each user's demand for five files
         demand = []
         for i in range(self.number_of_users):
-            demand.append(random.sample(list(range(self.number_of_total_files)), 10))
+            demand.append(random.sample(list(range(self.number_of_total_files)), number_of_files_each_user_leeches))
 
         # Find the demand and supply for file.
         self.demand_per_file = [0] * self.number_of_total_files
@@ -41,7 +50,7 @@ class sol:
         # IMPORTANT, this will change in future time steps. Now, we just select 4 files from each user's library of 50 files.
         self.seeders = []
         for i in range(self.number_of_users):
-            self.seeders.append(random.sample(self.files_available_to_seed[i], 10))
+            self.seeders.append(random.sample(self.files_available_to_seed[i], number_of_files_each_user_seeds))
 
         return
 
@@ -96,6 +105,7 @@ class sol:
         max_ratio = max(x for x in ratio_per_file if x != None)
         for i in range(self.number_of_total_files):
             if ratio_per_file[i] == None:
+                print("No one seeding this file!")
                 ratio_per_file[i] = 2 * max_ratio
 
         
@@ -143,31 +153,40 @@ class sol:
         # We take the top 4 files that have the highest score. If there is a tie, select it randomly
 
     
-        # iterate through each user
-        for user in range(self.number_of_users):
+        # iterate through only 50 percent of users.
+        for user in random.sample(range(self.number_of_users), int(self.number_of_users * self.percentage_users_to_update)):
+        # for user in range(self.number_of_users):
             # we randomly shuffle (we need to do this so that there users are randomly picking among ties)
             random.shuffle(list_of_tuples)
             list_of_tuples = sorted(list_of_tuples, key = lambda x: x[1], reverse=True)
-        
+            
+            # this is the file with the worst "availability ratio", recall high ratio is bad
+            # user will try to share it to improve their share ratio
+            file_to_seed = list_of_tuples[0]
+    
             # this is list of files in order of worst ratio, this is the priority we will 
             # expect users to upload to maximize their ratio
             ordered_list_of_files = [index for index, ratio in enumerate(list_of_tuples)]
             self.files_available_to_seed[user] = sorted(self.files_available_to_seed[user], 
                                                         key=lambda file: ordered_list_of_files[file])
+            
 
-            # we will only change one file!
-            if self.files_available_to_seed[user][0] in self.seeders[user]:
-                pass
+            if file_to_seed in self.seeders[user]:
+                continue
             else:
-                self.seeders[user] = [self.files_available_to_seed[user][0]] + [self.seeders[1:]]
+                # need to select file with lowest availability ratio (this means the file is already being shared a lot)
+                seeders_with_ratios = [(index, ratio) for index, ratio in list_of_tuples if index in self.seeders[user]]
+                seeders_with_ratios = sorted(seeders_with_ratios, key=lambda x: x[1], reverse=False)
+                file_to_toss = seeders_with_ratios[0]
+                # make sure we are actually improving the system
+                if file_to_seed[1] > file_to_toss[1]:
+                    self.seeders[user].remove(file_to_toss[0])
+                    self.seeders[user].append(file_to_seed[0])
 
 
         seeders_per_file = [0] * self.number_of_total_files
         for li in self.seeders:
             for i in li:
-                if type(i) != int:
-                    print('error')
-                    print(i)
                 seeders_per_file[i] += 1
 
         # We will use the ratio of the number of users who want the file and the number of users who are willing to provide the file 
@@ -194,6 +213,79 @@ class sol:
         
         return ratio_per_file
     
-    def build_graphs(self):
-        pass
+    def build_graph(self, generate_image = True):
+                # generate random list of files, and the number of people who want the files and list of people willing to provide the file
+        ratio = self.generate_random_preferences()
+        # calculate the latency of the system (this is what we will measure)
+        latency = self.calculate_latency(ratio)
+
+        new_latency = []
+        for i in range(100):
+
+            # readjust based on new share ratio criteria
+            new_ratio = self.recalculate(ratio)
+            adjusted_latency = self.calculate_latency(new_ratio)
+            new_latency.append(adjusted_latency)
+            ratio = new_ratio
+        
+        
+
+        if generate_image == True:
+            plt.figure(figsize=(10, 6))
+            x = list(range(len(new_latency)))
+            
+            # Scatter plot for all points
+            sns.scatterplot(x=x, y=new_latency, color='blue', label='New Latency')
+            
+            # Highlight the initial latency (single point, e.g., at x=-1)
+            plt.scatter(-1, latency, color='red', s=100, label='Initial Latency', zorder=5)
+            plt.text(-1, latency, f'{latency:.2f}', fontsize=9, ha='right', va='bottom', color='red')
+            
+            # Highlight the last point in new_latency
+            plt.scatter(len(new_latency)-1, new_latency[-1], color='green', s=100, label='Final Latency', zorder=5)
+            plt.text(len(new_latency)-1, new_latency[-1], f'{new_latency[-1]:.2f}', fontsize=9, ha='left', va='bottom', color='green')
+            
+            # Optionally, label the first point in new_latency
+            plt.text(0, new_latency[0], f'{new_latency[0]:.2f}', fontsize=9, ha='left', va='top', color='blue')
+            
+            plt.xlabel('Iteration')
+            plt.ylabel('Latency')
+            plt.title('Latency Over Iterations')
+            plt.legend()
+            plt.tight_layout()
+            # Save the figure as a PNG in the "graphs" folder
+            plt.savefig('graphs/latency_plot.png', dpi=300)
+            plt.close()
+        
+        return latency, adjusted_latency
+
+    def build_graph2(self):
+        original_latencies = []
+        new_latencies = []
+        for i in range(10):
+            random_latency, adjusted_latency = self.build_graph(generate_image = False)
+            original_latencies.append(random_latency)
+            new_latencies.append(adjusted_latency)
+
+        plt.figure(figsize=(10, 6))
+        x1 = list(range(len(original_latencies)))
+        x2 = list(range(len(new_latencies)))
+        
+        # Plot original_latencies in blue
+        sns.scatterplot(x=x1, y=original_latencies, color='blue', label='Original Latencies')
+        
+        # Plot new_latencies in red
+        sns.scatterplot(x=x2, y=new_latencies, color='red', label='New Latencies')
+        
+        plt.xlabel('Experiment')
+        plt.ylabel('Latency')
+        plt.title('Original vs New Latencies')
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig('graphs/latency_comparison.png', dpi=300)
+        plt.close()
+        return
+
+
+
         
