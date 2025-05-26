@@ -3,15 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-class sol:
+class simulation:
     def __init__(
             self,
             number_of_users: int = 1000, 
             number_of_total_files : int = 1000, 
             size_of_user_file_library: int = 50,
             percentage_users_to_update: int = .25,
-            number_of_files_each_user_leeches: int = 10,
-            number_of_files_each_user_seeds: int = 10
+            number_of_files_each_user_leeches_seeds: int = 5,
+            iterations_to_converge: int = 100,
+            iterations: int = 100
                  ):
         """
         Args:
@@ -22,11 +23,14 @@ class sol:
                 alter the file they are sharing. We don't want to update every one at the same time
 
         """
+        self.number_of_files_each_user_leeches_seeds = number_of_files_each_user_leeches_seeds
         self.number_of_users = number_of_users
         self.number_of_total_files = number_of_total_files
         self.size_of_user_file_library = size_of_user_file_library
         self.percentage_users_to_update = percentage_users_to_update
-
+        self.iterations_to_converge = iterations_to_converge
+        self.iterations = iterations
+        
         # We will say each user has 50 files that they can share if they want to.
         # this will stay constant throughout our experiment
         self.files_available_to_seed = []
@@ -37,7 +41,7 @@ class sol:
         # represents each user's demand for five files
         demand = []
         for i in range(self.number_of_users):
-            demand.append(random.sample(list(range(self.number_of_total_files)), number_of_files_each_user_leeches))
+            demand.append(random.sample(list(range(self.number_of_total_files)), number_of_files_each_user_leeches_seeds))
 
         # Find the demand and supply for file.
         self.demand_per_file = [0] * self.number_of_total_files
@@ -50,7 +54,7 @@ class sol:
         # IMPORTANT, this will change in future time steps. Now, we just select 4 files from each user's library of 50 files.
         self.seeders = []
         for i in range(self.number_of_users):
-            self.seeders.append(random.sample(self.files_available_to_seed[i], number_of_files_each_user_seeds))
+            self.seeders.append(random.sample(self.files_available_to_seed[i], number_of_files_each_user_leeches_seeds))
 
         return
 
@@ -220,7 +224,7 @@ class sol:
         latency = self.calculate_latency(ratio)
 
         new_latency = []
-        for i in range(100):
+        for i in range(self.iterations_to_converge):
 
             # readjust based on new share ratio criteria
             new_ratio = self.recalculate(ratio)
@@ -248,13 +252,13 @@ class sol:
             # Optionally, label the first point in new_latency
             plt.text(0, new_latency[0], f'{new_latency[0]:.2f}', fontsize=9, ha='left', va='top', color='blue')
             
-            plt.xlabel('Iteration')
+            plt.xlabel(f'{self.iterations_to_converge} Iterations')
             plt.ylabel('Latency')
-            plt.title('Latency Over Iterations')
+            plt.title(f'Number of files shared per person: {self.number_of_files_each_user_leeches_seeds}, Percent of Users Updating: {self.percentage_users_to_update} \n Latency Over Iterations')
             plt.legend()
             plt.tight_layout()
             # Save the figure as a PNG in the "graphs" folder
-            plt.savefig('graphs/latency_plot.png', dpi=300)
+            plt.savefig(f'graphs/parameter_exploration/num_files_{self.number_of_files_each_user_leeches_seeds}_pct_updating_{self.percentage_users_to_update}_iter_{self.iterations_to_converge}.png', dpi=300)
             plt.close()
         
         return latency, adjusted_latency
@@ -262,28 +266,26 @@ class sol:
     def build_graph2(self):
         original_latencies = []
         new_latencies = []
-        for i in range(10):
+        for i in range(self.iterations):
             random_latency, adjusted_latency = self.build_graph(generate_image = False)
             original_latencies.append(random_latency)
             new_latencies.append(adjusted_latency)
+        
+        # We assume latency more or less converges after 1000 runs. We run the simulation
+        # an additional 1000 times (100,000 total cycles)
 
-        plt.figure(figsize=(10, 6))
-        x1 = list(range(len(original_latencies)))
-        x2 = list(range(len(new_latencies)))
-        
-        # Plot original_latencies in blue
-        sns.scatterplot(x=x1, y=original_latencies, color='blue', label='Original Latencies')
-        
-        # Plot new_latencies in red
-        sns.scatterplot(x=x2, y=new_latencies, color='red', label='New Latencies')
-        
-        plt.xlabel('Experiment')
-        plt.ylabel('Latency')
-        plt.title('Original vs New Latencies')
-        plt.legend()
+        # We take a look at each reduction in latency, and see what the distribution looks
+        # like
+        reductions = original_latencies - new_latencies
+
+        # Assume reductions is your list of 1000 latency reduction values
+        plt.figure(figsize=(8, 6))
+        sns.boxplot(y=reductions, color='skyblue')
+        sns.stripplot(y=reductions, color='black', alpha=0.2, jitter=True)
+        plt.ylabel('Latency Reduction')
+        plt.title('Distribution of Latency Reduction Over 1000 Simulations')
         plt.tight_layout()
-        plt.savefig('graphs/latency_comparison.png', dpi=300)
-        plt.close()
+        plt.show()
         return
 
 
